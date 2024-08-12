@@ -535,17 +535,17 @@ static void open_device(void) {
 
 static void usage(FILE *fp, int argc, char **argv) {
   fprintf(fp,
-          "Usage: %s [options]\\n\\n"
-          "Version 1.3\\n"
-          "Options:\\n"
-          "-d | --device name   Video device name [%s]n"
-          "-h | --help          Print this messagen"
-          "-m | --mmap          Use memory mapped buffers [default]n"
-          "-r | --read          Use read() callsn"
-          "-u | --userp         Use application allocated buffersn"
-          "-o | --output        Outputs stream to stdoutn"
-          "-f | --format        Force format to 640x480 YUYVn"
-          "-c | --count         Number of frames to grab [%i]n"
+          "Usage: %s [options]\n"
+          "Version 1.3\n"
+          "Options:\n"
+          "-d | --device name   Video device name [%s]\n"
+          "-h | --help          Print this message\n"
+          "-m | --mmap          Use memory mapped buffers [default]\n"
+          "-r | --read          Use read() calls\n"
+          "-u | --userp         Use application allocated buffers\n"
+          "-o | --output        Outputs stream to stdout\n"
+          "-f | --format        Force format to 640x480 YUYV\n"
+          "-c | --count         Number of frames to grab [%i]\n"
           "",
           argv[0], dev_name, frame_count);
 }
@@ -564,7 +564,8 @@ static const struct option long_options[] = {
     {0, 0, 0, 0}};
 
 int main(int argc, char **argv) {
-  dev_name = "/dev/video0";
+  dev_name = "/dev/video0"; // Opening by default, could set device name via -d
+                            // flag like /dev/video1
 
   for (;;) {
     int idx;
@@ -627,6 +628,6 @@ int main(int argc, char **argv) {
   stop_capturing();
   uninit_device();
   close_device();
-  fprintf(stderr, "\\n");
+  fprintf(stderr, "\n");
   return 0;
 }
