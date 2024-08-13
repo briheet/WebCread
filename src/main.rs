@@ -5,8 +5,10 @@ use std::os::fd::AsRawFd;
 
 mod v4l2;
 
-const VIDIOC_QUERYCAP: u64 = 2154321408;
 const DEVICE_NAME: &str = "/dev/video0";
+const VIDIOC_QUERYCAP: u64 = 2154321408;
+const VIDIOC_G_FMT: u64 = 3234878980;
+const V4L2_PIX_FMT_MJPEG: u32 = 1196444237;
 
 macro_rules! ioctl {
     ($fd:expr, $num:expr, $arg:expr) => {{
@@ -35,7 +37,25 @@ fn main() {
 
     assert!((capabilities.capabilities & v4l2::V4L2_CAP_VIDEO_CAPTURE) != 0);
     // it does not have the read wite -> ./test -r
-    // assert!((capabilities.capabilities & v4ls::V4L2_CAP_READWRITE));
+    assert!((capabilities.capabilities & v4l2::V4L2_CAP_STREAMING) != 0);
+
+    let format = unsafe {
+        let mut format: v4l2::v4l2_format = std::mem::zeroed();
+        format.type_ = v4l2::v4l2_buf_type_V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        ioctl!(fd, VIDIOC_G_FMT, &mut format).unwrap();
+        format
+    };
 
     println!("{:?}", capabilities);
+    unsafe {
+        println!("image size: {:?}", format.fmt.pix.sizeimage);
+        println!(
+            "image width: {}, image height: {}, image pixel_format: {}",
+            format.fmt.pix.width, format.fmt.pix.height, format.fmt.pix.pixelformat
+        );
+    }
+
+    unsafe {
+        assert!((format.fmt.pix.pixelformat & V4L2_PIX_FMT_MJPEG) != 0);
+    }
 }
