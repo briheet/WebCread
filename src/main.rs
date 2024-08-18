@@ -3,12 +3,15 @@ use std::fs::OpenOptions;
 use std::mem::MaybeUninit;
 use std::os::fd::AsRawFd;
 
+use v4l2::{v4l2_area, v4l2_buf_type_V4L2_BUF_TYPE_VIDEO_CAPTURE, v4l2_memory_V4L2_MEMORY_USERPTR};
+
 mod v4l2;
 
 const DEVICE_NAME: &str = "/dev/video0";
 const VIDIOC_QUERYCAP: u64 = 2154321408;
 const VIDIOC_G_FMT: u64 = 3234878980;
 const V4L2_PIX_FMT_MJPEG: u32 = 1196444237;
+const VIDIOC_REQBUFS: u64 = 3222558216;
 
 macro_rules! ioctl {
     ($fd:expr, $num:expr, $arg:expr) => {{
@@ -57,5 +60,14 @@ fn main() {
 
     unsafe {
         assert!((format.fmt.pix.pixelformat & V4L2_PIX_FMT_MJPEG) != 0);
+    }
+
+    unsafe {
+        let mut buf: v4l2::v4l2_requestbuffers = std::mem::zeroed();
+        buf.count = 4;
+        buf.type_ = v4l2_buf_type_V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        buf.memory = v4l2_memory_V4L2_MEMORY_USERPTR;
+
+        ioctl!(fd, VIDIOC_REQBUFS, &mut buf).unwrap();
     }
 }
