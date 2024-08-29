@@ -12,6 +12,10 @@ const VIDIOC_QUERYCAP: u64 = 2154321408;
 const VIDIOC_G_FMT: u64 = 3234878980;
 const V4L2_PIX_FMT_MJPEG: u32 = 1196444237;
 const VIDIOC_REQBUFS: u64 = 3222558216;
+const VIDIOC_QBUF: u64 = 3227014671;
+const V4L2_BUF_TYPE_VIDEO_CAPTURE: u32 = 1;
+const V4L2_MEMORY_USERPTR: u32 = 2;
+const VIDIOC_STREAMON: u64 = 1074026002;
 
 macro_rules! ioctl {
     ($fd:expr, $num:expr, $arg:expr) => {{
@@ -65,6 +69,7 @@ fn main() {
     let image_size = unsafe { format.fmt.pix.sizeimage };
 
     const NUM_BUFFERS: u32 = 4;
+    // FIXME: unsafe cell around each bufs
     let mut bufs = Vec::new();
 
     for i in 0..NUM_BUFFERS {
@@ -78,5 +83,24 @@ fn main() {
         buf.memory = v4l2_memory_V4L2_MEMORY_USERPTR;
 
         ioctl!(fd, VIDIOC_REQBUFS, &mut buf).unwrap();
+    }
+
+    for i in 0..NUM_BUFFERS {
+        unsafe {
+            let mut v4l2_buf: v4l2::v4l2_buffer = std::mem::zeroed();
+
+            let buf = &bufs[i as usize];
+            v4l2_buf.type_ = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+            v4l2_buf.index = i;
+            v4l2_buf.memory = V4L2_MEMORY_USERPTR;
+            v4l2_buf.m.userptr = bufs[i as usize].as_ptr() as u64;
+            v4l2_buf.length = bufs[i as usize].len() as u32;
+            ioctl!(fd, VIDIOC_QBUF, &v4l2_buf).unwrap();
+        }
+    }
+
+    let video_cap_buf_type: v4l2::v4l2_buf_type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    unsafe {
+        ioctl!(fd, VIDIOC_STREAMON, &video_cap_buf_type).unwrap();
     }
 }
