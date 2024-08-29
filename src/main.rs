@@ -62,9 +62,18 @@ fn main() {
         assert!((format.fmt.pix.pixelformat & V4L2_PIX_FMT_MJPEG) != 0);
     }
 
+    let image_size = unsafe { format.fmt.pix.sizeimage };
+
+    const NUM_BUFFERS: u32 = 4;
+    let mut bufs = Vec::new();
+
+    for i in 0..NUM_BUFFERS {
+        bufs.push(vec![0u8; image_size.try_into().unwrap()]);
+    }
+
     unsafe {
         let mut buf: v4l2::v4l2_requestbuffers = std::mem::zeroed();
-        buf.count = 4;
+        buf.count = NUM_BUFFERS;
         buf.type_ = v4l2_buf_type_V4L2_BUF_TYPE_VIDEO_CAPTURE;
         buf.memory = v4l2_memory_V4L2_MEMORY_USERPTR;
 
