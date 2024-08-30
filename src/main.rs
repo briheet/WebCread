@@ -1,8 +1,10 @@
-use std::fmt::Result;
 use std::fs::OpenOptions;
+use std::io::Write;
 use std::mem::MaybeUninit;
 use std::os::fd::AsRawFd;
+use std::{fmt::Result, thread};
 
+use libc::ioctl;
 use v4l2::{v4l2_area, v4l2_buf_type_V4L2_BUF_TYPE_VIDEO_CAPTURE, v4l2_memory_V4L2_MEMORY_USERPTR};
 
 mod v4l2;
@@ -16,6 +18,8 @@ const VIDIOC_QBUF: u64 = 3227014671;
 const V4L2_BUF_TYPE_VIDEO_CAPTURE: u32 = 1;
 const V4L2_MEMORY_USERPTR: u32 = 2;
 const VIDIOC_STREAMON: u64 = 1074026002;
+const VIDIOC_DQBUF: u64 = 3227014673;
+const V4L2_PIX_FMT_YUYV: u32 = 1448695129;
 
 macro_rules! ioctl {
     ($fd:expr, $num:expr, $arg:expr) => {{
@@ -63,7 +67,7 @@ fn main() {
     }
 
     unsafe {
-        assert!((format.fmt.pix.pixelformat & V4L2_PIX_FMT_MJPEG) != 0);
+        assert!((format.fmt.pix.pixelformat & V4L2_PIX_FMT_YUYV) != 0);
     }
 
     let image_size = unsafe { format.fmt.pix.sizeimage };
@@ -99,8 +103,47 @@ fn main() {
         }
     }
 
+    // drop(bufs);
+
     let video_cap_buf_type: v4l2::v4l2_buf_type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     unsafe {
         ioctl!(fd, VIDIOC_STREAMON, &video_cap_buf_type).unwrap();
+    }
+
+    loop {
+        unsafe {
+            let mut poll_fd: [v4l2::pollfd; 1] = [v4l2::pollfd {
+                fd,
+                events: v4l2::POLLIN as i16,
+                revents: 0,
+            }];
+
+            println!(
+                "{}",
+                v4l2::poll(poll_fd.as_mut_ptr(), poll_fd.len() as u64, -1)
+            );
+
+            let mut v4l2_buf: v4l2::v4l2_buffer = std::mem::zeroed();
+
+            v4l2_buf.type_ = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+            v4l2_buf.memory = V4L2_MEMORY_USERPTR;
+
+            ioctl!(fd, VIDIOC_DQBUF, &mut v4l2_buf).unwrap();
+            let buf = std::slice::from_raw_parts(
+                v4l2_buf.m.userptr as *const u8,
+                v4l2_buf.length as usize,
+            );
+            let mut output = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open("test.yuv")
+                .unwrap();
+            output.write_all(&buf).unwrap();
+
+            ioctl!(fd, VIDIOC_QBUF, &mut v4l2_buf).unwrap();
+            return;
+            // println!("{}", rgb.len());
+            // println!("{:?}", decoder.info().unwrap());
+        }
     }
 }
