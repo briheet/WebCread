@@ -7,3 +7,4 @@ const VIDIOC_QBUF: u64 = 3227014671;
 const V4L2_BUF_TYPE_VIDEO_CAPTURE: u32 = 1;
 const V4L2_MEMORY_USERPTR: u32 = 2;
 const VIDIOC_STREAMON: u64 = 1074026002;
+v4l2-ctl --set-fmt-video=width=640,height=480,pixelformat=YUYV

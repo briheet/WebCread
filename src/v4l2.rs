@@ -51,6 +51,15 @@ pub struct V4L2Frame<'a> {
 }
 
 impl V4L2Frame<'_> {
+    pub fn width(&self) -> usize {
+        // FIXME: Get the actual rather than hardcoing
+        640
+    }
+
+    pub fn height(&self) -> usize {
+        // FIXME: Get the actual rather than hardcoing
+        480
+    }
     pub fn data(&self) -> &[u8] {
         unsafe {
             std::slice::from_raw_parts(self.buf.m.userptr as *const u8, self.buf.length as usize)
@@ -93,12 +102,15 @@ impl V4L2VideoDevice {
             format
         };
 
-        println!("{:?}", capabilities);
+        // println!("{:?}", capabilities);
         unsafe {
             println!("image size: {:?}", format.fmt.pix.sizeimage);
             println!(
-                "image width: {}, image height: {}, image pixel_format: {}",
-                format.fmt.pix.width, format.fmt.pix.height, format.fmt.pix.pixelformat
+                "image width: {}, image height: {}, image pixel_format: {}, image sizeimage: {}",
+                format.fmt.pix.width,
+                format.fmt.pix.height,
+                format.fmt.pix.pixelformat,
+                format.fmt.pix.sizeimage
             );
         }
 
