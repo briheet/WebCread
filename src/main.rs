@@ -1,13 +1,17 @@
-use eframe::egui::{self, Color32, ColorImage};
+use eframe::egui::{self, Color32, ColorImage, TextureHandle};
+use eframe::glow::Texture;
 use libc::printf;
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::sync::mpsc::{self, Receiver, Sender};
+use v4l2::V4L2VideoDevice;
 mod v4l2;
 
 const DEVICE_NAME: &str = "/dev/video0";
 
 struct WebCamUI {
-    v4l2_device: v4l2::V4L2VideoDevice,
+    rx: Receiver<TextureHandle>,
+    last_texture: Option<TextureHandle>,
 }
 
 impl WebCamUI {
@@ -17,59 +21,42 @@ impl WebCamUI {
         // Use the cc.gl (a glow::Context) to create graphics shaders and buffers that you can use
         // for e.g. egui::PaintCallback.
         // Self::default();
+        let ctx = cc.egui_ctx.clone();
         let v4l2_device = v4l2::V4L2VideoDevice::new(&DEVICE_NAME);
 
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || feed_gui(v4l2_device, tx, ctx));
+
         WebCamUI {
-            v4l2_device: (v4l2_device),
+            rx,
+            last_texture: None,
         }
     }
 }
 
 impl eframe::App for WebCamUI {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        let frame = self.v4l2_device.get_frame();
-        //Yuyv
+        while let Ok(v) = self.rx.try_recv() {
+            self.last_texture = Some(v);
+        }
+        egui::CentralPanel::default().show(ctx, |ui| {
+            if let Some(texture) = &self.last_texture {
+                ui.image((texture.id(), texture.size_vec2()));
+            }
+        });
+    }
+}
+
+fn feed_gui(v4l2_device: v4l2::V4L2VideoDevice, tx: Sender<TextureHandle>, ctx: egui::Context) {
+    loop {
+        let frame = v4l2_device.get_frame();
         let data = frame.data();
 
-        // let width = frame.width();
-        // let height = frame.height();
-        // let mut color_data: Vec<Color32> = Vec::with_capacity(width * height);
         let color_data: Vec<Color32> = data
             .iter()
             .step_by(2)
             .map(|y| egui::Color32::from_rgb(*y, *y, *y))
             .collect();
-
-        // let width = frame.width();
-        // let height = frame.height();
-        //
-        // let mut color_data: Vec<Color32> = Vec::with_capacity(width * height);
-        //
-        //
-        // // Convert YUYV to RGB
-        // for chunk in data.chunks(4) {
-        //     if chunk.len() != 4 {
-        //         eprintln!("Chunk length is not 4: {:?}", chunk);
-        //         continue; // Skip this chunk if it's not complete
-        //     }
-        //     let y1 = chunk[0] as i32;
-        //     let u = chunk[1] as i32;
-        //     let y2 = chunk[2] as i32;
-        //     let v = chunk[3] as i32;
-        //
-        //     let r1 = (y1 as f32 + 1.402 * (v as f32 - 128.0)).clamp(0.0, 255.0) as u8;
-        //     let g1 = (y1 as f32 - 0.344 * (u as f32 - 128.0) - 0.714 * (v as f32 - 128.0))
-        //         .clamp(0.0, 255.0) as u8;
-        //     let b1 = (y1 as f32 + 1.772 * (u as f32 - 128.0)).clamp(0.0, 255.0) as u8;
-        //
-        //     let r2 = (y2 as f32 + 1.402 * (v as f32 - 128.0)).clamp(0.0, 255.0) as u8;
-        //     let g2 = (y2 as f32 - 0.344 * (u as f32 - 128.0) - 0.714 * (v as f32 - 128.0))
-        //         .clamp(0.0, 255.0) as u8;
-        //     let b2 = (y2 as f32 + 1.772 * (u as f32 - 128.0)).clamp(0.0, 255.0) as u8;
-        //
-        //     color_data.push(Color32::from_rgb(r1, g1, b1));
-        //     color_data.push(Color32::from_rgb(r2, g2, b2));
-        // }
 
         let image = ColorImage {
             size: [frame.width(), frame.height()],
@@ -77,10 +64,8 @@ impl eframe::App for WebCamUI {
         };
 
         let texture = ctx.load_texture("image", image, egui::TextureOptions::LINEAR);
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.image((texture.id(), texture.size_vec2()));
-        });
+        tx.send(texture).unwrap();
+        ctx.request_repaint();
     }
 }
 
