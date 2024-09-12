@@ -1,10 +1,5 @@
 use eframe::egui::{self, Color32, ColorImage, TextureHandle};
-use eframe::glow::Texture;
-use libc::printf;
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::sync::mpsc::{self, Receiver, Sender};
-use v4l2::V4L2VideoDevice;
 mod v4l2;
 
 const DEVICE_NAME: &str = "/dev/video0";
@@ -16,11 +11,6 @@ struct WebCamUI {
 
 impl WebCamUI {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // Customize egui here with cc.egui_ctx.set_fonts and cc.egui_ctx.set_visuals.
-        // Restore app state using cc.storage (requires the "persistence" feature).
-        // Use the cc.gl (a glow::Context) to create graphics shaders and buffers that you can use
-        // for e.g. egui::PaintCallback.
-        // Self::default();
         let ctx = cc.egui_ctx.clone();
         let v4l2_device = v4l2::V4L2VideoDevice::new(&DEVICE_NAME);
 
@@ -35,7 +25,7 @@ impl WebCamUI {
 }
 
 impl eframe::App for WebCamUI {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         while let Ok(v) = self.rx.try_recv() {
             self.last_texture = Some(v);
         }
@@ -79,12 +69,6 @@ fn feed_gui(v4l2_device: v4l2::V4L2VideoDevice, tx: Sender<TextureHandle>, ctx: 
             })
             .collect();
 
-        // let color_data: Vec<Color32> = data
-        //     .iter()
-        //     .step_by(2)
-        //     .map(|y| egui::Color32::from_rgb(*y, *y, *y))
-        //     .collect();
-
         let image = ColorImage {
             size: [frame.width(), frame.height()],
             pixels: color_data,
@@ -96,23 +80,12 @@ fn feed_gui(v4l2_device: v4l2::V4L2VideoDevice, tx: Sender<TextureHandle>, ctx: 
     }
 }
 
-// Y U Y V
-// Ys -> take every other Y
-// Us -> take every 4th U, and duplicate
-// Y U Y V
-
 fn main() {
     let native_options = eframe::NativeOptions::default();
     eframe::run_native(
         "My egui App",
         native_options,
         Box::new(|cc| Ok(Box::new(WebCamUI::new(cc)))),
-    );
-
-    // let mut output = OpenOptions::new()
-    //     .write(true)
-    //     .create(true)
-    //     .open("test.yuv")
-    //     .unwrap();
-    // output.write_all(frame.data()).unwrap();
+    )
+    .unwrap();
 }

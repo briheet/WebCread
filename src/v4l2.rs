@@ -14,12 +14,13 @@ use std::mem::MaybeUninit;
 use std::os::fd::AsRawFd;
 use std::path::Path;
 
-// use v4l2::{v4l2_area, v4l2_buf_type_V4L2_BUF_TYPE_VIDEO_CAPTURE, v4l2_memory_V4L2_MEMORY_USERPTR};
+use sys::ioctl;
+use sys::v4l2_fmtdesc;
 
 const DEVICE_NAME: &str = "/dev/video0";
+const VIDIOC_ENUM_FMT: u64 = 3225441794;
 const VIDIOC_QUERYCAP: u64 = 2154321408;
 const VIDIOC_G_FMT: u64 = 3234878980;
-const V4L2_PIX_FMT_MJPEG: u32 = 1196444237;
 const VIDIOC_REQBUFS: u64 = 3222558216;
 const VIDIOC_QBUF: u64 = 3227014671;
 const V4L2_BUF_TYPE_VIDEO_CAPTURE: u32 = 1;
@@ -41,24 +42,26 @@ macro_rules! ioctl {
 
 pub struct V4L2VideoDevice {
     handle: File,
+    width: usize,
+    height: usize,
     _bufs: Vec<Vec<u8>>,
 }
 
 pub struct V4L2Frame<'a> {
     fd: i32,
+    width: usize,
+    height: usize,
     buf: sys::v4l2_buffer,
     _phantom: PhantomData<&'a ()>,
 }
 
 impl V4L2Frame<'_> {
     pub fn width(&self) -> usize {
-        // FIXME: Get the actual rather than hardcoing
-        640
+        self.width
     }
 
     pub fn height(&self) -> usize {
-        // FIXME: Get the actual rather than hardcoing
-        480
+        self.height
     }
     pub fn data(&self) -> &[u8] {
         unsafe {
@@ -155,10 +158,27 @@ impl V4L2VideoDevice {
         unsafe {
             ioctl!(fd, VIDIOC_STREAMON, &video_cap_buf_type).unwrap();
         }
+        unsafe {
+            V4L2VideoDevice {
+                handle: video_handle,
+                width: format.fmt.pix.width as usize,
+                height: format.fmt.pix.height as usize,
+                _bufs: bufs,
+            }
+        }
+    }
 
-        V4L2VideoDevice {
-            handle: video_handle,
-            _bufs: bufs,
+    pub fn printformats(&self) {
+        let mut i = 0;
+        let fd = self.handle.as_raw_fd();
+        loop {
+            unsafe {
+                let mut desc: sys::v4l2_fmtdesc = std::mem::zeroed();
+                desc.type_ = sys::v4l2_buf_type_V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                desc.index = i;
+                ioctl(fd, VIDIOC_ENUM_FMT, &mut desc);
+            }
+            i += 1;
         }
     }
 
@@ -185,6 +205,8 @@ impl V4L2VideoDevice {
             V4L2Frame {
                 fd,
                 buf: v4l2_buf,
+                width: self.width,
+                height: self.height,
                 _phantom: PhantomData,
             }
         }
