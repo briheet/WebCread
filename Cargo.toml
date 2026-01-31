@@ -3,6 +3,9 @@ name = "WebCread"
 version = "0.1.0"
 edition = "2024"
 
+[profile.dev]
+opt-level = 1
+
 [dependencies]
 eframe = "0.33.3"
 nokhwa = { version = "0.10.10", features = ["input-native"] }

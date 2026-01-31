@@ -36,10 +36,7 @@ impl eframe::App for MyEguiApp {
             match &self.texture {
                 Some(tex) => {
                     let available = ui.available_size();
-                    ui.image(egui::load::SizedTexture::new(
-                        tex.id(),
-                        available,
-                    ));
+                    ui.image(egui::load::SizedTexture::new(tex.id(), available));
                 }
                 None => {
                     ui.label("Waiting for camera...");

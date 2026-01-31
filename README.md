@@ -7,11 +7,14 @@ Hobby project, just to fck with claude review and trying to rewrite something.
 
 **With Cargo:**
 ```bash
-cargo build
+# This is slow due to not optimized build. Use cargo build --release for better viewing.
 cargo run
+
+# Use this for better viewing
+cargo build --release && ./target/release/WebCread
 ```
 
 **With Nix:**
 ```bash
-nix run
+nix run github:briheet/WebCread
 ```

@@ -1,7 +1,7 @@
 use nokhwa::{
     Camera, NokhwaError,
     pixel_format::RgbFormat,
-    utils::{CameraIndex, FrameFormat, RequestedFormat, RequestedFormatType},
+    utils::{CameraIndex, RequestedFormat, RequestedFormatType},
 };
 use std::sync::{Arc, Mutex, atomic::AtomicBool};
 
@@ -10,7 +10,6 @@ pub struct CameraData {
     pub width: u32,
     pub height: u32,
     pub data: Vec<u8>,
-    pub frame_format: FrameFormat,
 }
 
 // Shared state between CameraData recieved and egui
@@ -55,13 +54,17 @@ pub fn capture_camera_data(
     };
 
     while running.load(std::sync::atomic::Ordering::Relaxed) {
+        // Previous frame was not consumed hence skip taking new frame
+        if camera_data.lock().unwrap().is_some() {
+            continue;
+        }
+
         match camera.frame() {
             Ok(buffer) => {
                 let frame_data = CameraData {
                     width: buffer.resolution().width(),
                     height: buffer.resolution().height(),
                     data: buffer.decode_image::<RgbFormat>().unwrap().into_raw(),
-                    frame_format: buffer.source_frame_format(),
                 };
 
                 let mut lock = camera_data.lock().unwrap();
