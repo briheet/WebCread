@@ -1,10 +1,22 @@
 use nokhwa::{
-    Camera,
+    Camera, NokhwaError,
     pixel_format::RgbFormat,
-    utils::{CameraIndex, RequestedFormat, RequestedFormatType},
+    utils::{CameraIndex, FrameFormat, RequestedFormat, RequestedFormatType},
 };
+use std::sync::{Arc, Mutex, atomic::AtomicBool};
 
-fn get_camera_data() {
+// Main camera data. Dervied fields come from camera.format
+pub struct CameraData {
+    pub width: u32,
+    pub height: u32,
+    pub data: Vec<u8>,
+    pub frame_format: FrameFormat,
+}
+
+// Shared state between CameraData recieved and egui
+pub type SharedData = Arc<Mutex<Option<CameraData>>>;
+
+fn set_up_camera() -> Result<Camera, NokhwaError> {
     println!("Starting camera...");
 
     let index = CameraIndex::Index(0);
@@ -16,22 +28,59 @@ fn get_camera_data() {
         Ok(cam) => cam,
         Err(e) => {
             eprintln!("Error creating camera: {}", e);
-            return;
+            return Err(e);
         }
     };
 
-    camera.open_stream().unwrap();
-
-    println!("Capturing frame...");
-    let frame = match camera.frame() {
-        Ok(f) => f,
+    match camera.open_stream() {
+        Ok(()) => {}
         Err(e) => {
-            eprintln!("Error capturing frame: {}", e);
-            return;
+            eprintln!("Error opening stream: {}", e);
+            return Err(e);
+        }
+    }
+    Ok(camera)
+}
+
+pub fn capture_camera_data(
+    camera_data: Arc<Mutex<Option<CameraData>>>,
+    running: Arc<AtomicBool>,
+) -> Result<(), NokhwaError> {
+    let mut camera = match set_up_camera() {
+        Ok(cam) => cam,
+        Err(e) => {
+            eprintln!("Error setting up camera: {e}");
+            return Err(e);
         }
     };
 
-    println!("Captured frame: {}", frame.resolution());
+    while running.load(std::sync::atomic::Ordering::Relaxed) {
+        match camera.frame() {
+            Ok(buffer) => {
+                let frame_data = CameraData {
+                    width: buffer.resolution().width(),
+                    height: buffer.resolution().height(),
+                    data: buffer.buffer_bytes().to_vec(),
+                    frame_format: buffer.source_frame_format(),
+                };
 
-    camera.stop_stream().unwrap();
+                let mut lock = camera_data.lock().unwrap();
+                *lock = Some(frame_data);
+            }
+            Err(e) => {
+                eprintln!("Error capturing frame: {e}");
+                break;
+            }
+        }
+    }
+
+    match camera.stop_stream() {
+        Ok(()) => {}
+        Err(e) => {
+            eprintln!("Error closing the camera stream: {}", e);
+            return Err(e);
+        }
+    }
+
+    Ok(())
 }
