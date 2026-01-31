@@ -21,7 +21,7 @@ fn set_up_camera() -> Result<Camera, NokhwaError> {
 
     let index = CameraIndex::Index(0);
     let request_format_type =
-        RequestedFormat::new::<RgbFormat>(RequestedFormatType::AbsoluteHighestResolution);
+        RequestedFormat::new::<RgbFormat>(RequestedFormatType::AbsoluteHighestFrameRate);
 
     println!("Creating camera object...");
     let mut camera = match Camera::new(index, request_format_type) {
@@ -60,7 +60,7 @@ pub fn capture_camera_data(
                 let frame_data = CameraData {
                     width: buffer.resolution().width(),
                     height: buffer.resolution().height(),
-                    data: buffer.buffer_bytes().to_vec(),
+                    data: buffer.decode_image::<RgbFormat>().unwrap().into_raw(),
                     frame_format: buffer.source_frame_format(),
                 };
 
