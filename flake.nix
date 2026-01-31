@@ -30,6 +30,27 @@
             version = "0.1.0";
             src = self;
             cargoLock.lockFile = ./Cargo.lock;
+
+            nativeBuildInputs = with pkgs; [
+              pkg-config
+            ];
+
+            buildInputs = with pkgs; [
+              libxkbcommon
+              libGL
+              wayland
+              xorg.libX11
+              xorg.libXcursor
+              xorg.libXrandr
+              xorg.libXi
+            ] ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin (with pkgs.darwin.apple_sdk.frameworks; [
+              AppKit
+              AVFoundation
+              CoreMedia
+              CoreVideo
+              Metal
+              QuartzCore
+            ]);
           };
         }
       );
